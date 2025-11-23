@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-redis>=4.0.0
 python-multipart
 pydantic
 pydantic-settings
@@ -10,3 +9,4 @@ langchain-google-genai
 langchain-text-splitters
 pypdf
 tiktoken
+faiss-cpu

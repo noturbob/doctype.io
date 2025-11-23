@@ -1,0 +1,29 @@
+# --- Security (CRITICAL) ---
+.env
+.env.local
+*.key
+*.pem
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtual Environment ---
+venv/
+env/
+.venv/
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+
+# --- Data & Temporary Files ---
+faiss_index/
+temp_*.pdf
+*.log
+*.sqlite3
+
+# --- OS Junk ---
+.DS_Store
+Thumbs.db

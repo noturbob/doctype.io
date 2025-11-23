@@ -1,35 +1,36 @@
-from langchain_community.vectorstores import Redis
+import os
+from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from app.config import settings
 
-# 1. Initialize FREE Local Embeddings
-# This runs entirely on your CPU. No API keys needed.
-# It downloads a small model (~100MB) the first time you run it.
+# Initialize Embeddings
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+DB_PATH = "faiss_index"
 
 def add_to_vector_store(chunks):
     """
-    Takes text chunks, turns them into vectors, and saves them to Redis.
+    Takes text chunks, turns them into vectors, and saves them to a local FAISS index.
     """
-    # NOTE: The class is 'Redis', NOT 'RedisVectorStore' for langchain-community
-    Redis.from_documents(
-        documents=chunks,
-        embedding=embeddings,
-        redis_url=settings.REDIS_URL,
-        index_name=settings.REDIS_INDEX_NAME
-    )
+    if os.path.exists(DB_PATH):
+        # Load existing index and add new chunks
+        db = FAISS.load_local(DB_PATH, embeddings, allow_dangerous_deserialization=True)
+        db.add_documents(chunks)
+    else:
+        # Create new index from chunks
+        db = FAISS.from_documents(chunks, embeddings)
+    
+    # Save to disk
+    db.save_local(DB_PATH)
     return True
 
 def get_retriever():
     """
-    Connects to the existing Redis index and returns a search tool.
+    Loads the local FAISS index and returns a search tool.
     """
-    # NOTE: The class is 'Redis', NOT 'RedisVectorStore' for langchain-community
-    vector_store = Redis(
-        redis_url=settings.REDIS_URL,
-        index_name=settings.REDIS_INDEX_NAME,
-        embedding=embeddings
-    )
-    
-    # k=3 means "Find the top 3 most relevant chunks"
+    if not os.path.exists(DB_PATH):
+        # Return an empty index if none exists yet
+        empty_db = FAISS.from_texts([""], embeddings)
+        return empty_db.as_retriever(search_kwargs={"k": 1})
+
+    vector_store = FAISS.load_local(DB_PATH, embeddings, allow_dangerous_deserialization=True)
     return vector_store.as_retriever(search_kwargs={"k": 3})

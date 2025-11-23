@@ -1,19 +1,16 @@
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # We use Google Gemini (Free) for the Chat Model
     GOOGLE_API_KEY: str
     
-    # We use Redis for the Database
-    REDIS_URL: str = "redis://localhost:6379"
-    REDIS_INDEX_NAME: str = "doctype"
-
-    # Optional: Keep OpenAI here just in case you want to switch back later, but it's not used now.
+    # Optional: Keep OpenAI here just in case you want to switch back later
     OPENAI_API_KEY: Optional[str] = None 
 
-    class Config:
-        env_file = ".env"
+    # This configuration tells Pydantic to read from .env but IGNORE variables
+    # that are not defined in this class (like the old REDIS_* vars)
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
