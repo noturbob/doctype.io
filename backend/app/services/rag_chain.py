@@ -2,7 +2,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-from app.services.redis_store import get_retriever
+# CHANGED: Import from vector_store instead of redis_store
+from app.services.vector_store import get_retriever
 from app.config import settings
 
 async def generate_answer(question: str):

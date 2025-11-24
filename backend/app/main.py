@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import our modular parts
 from app.models.schemas import ChatRequest, ChatResponse, IngestResponse
 from app.services.pdf_loader import load_and_split_pdf
-from app.services.redis_store import add_to_vector_store
+# CHANGED: Switched from redis_store to vector_store (FAISS)
+from app.services.vector_store import add_to_vector_store
 from app.services.rag_chain import generate_answer
 
 app = FastAPI(title="Doctype.io API", version="1.0")
@@ -26,7 +27,7 @@ def health_check():
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest_document(file: UploadFile = File(...)):
     """
-    Uploads a PDF, splits it, and saves vectors to Redis.
+    Uploads a PDF, splits it, and saves vectors to FAISS (Memory).
     """
     # 1. Save file temporarily
     temp_filename = f"temp_{file.filename}"
@@ -37,7 +38,7 @@ async def ingest_document(file: UploadFile = File(...)):
         # 2. Process the file (Load -> Split)
         chunks = await load_and_split_pdf(temp_filename)
         
-        # 3. Store in Redis
+        # 3. Store in Vector DB (FAISS)
         add_to_vector_store(chunks)
         
         return IngestResponse(
