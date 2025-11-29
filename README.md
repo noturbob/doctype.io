@@ -281,7 +281,7 @@ Special thanks to these amazing technologies:
 
 **⭐ Star this repo if you find it helpful!**
 
-Made with ❤️ by [noturbob]
+Made with ❤️ by noturbob
 
 [Report Bug](https://github.com/noturbob/doctype.io/issues) • [Request Feature](https://github.com/noturbob/doctype.io/issues)
 
