@@ -26,6 +26,7 @@ pypdf==5.1.0
 # Utilities
 tiktoken==0.8.0
 
-# Authentication & Security
+# Authentication & Security (for future use)
 python-jose[cryptography]==3.3.0
-clerk-sdk-python==0.1.3
+cryptography==43.0.3
+# clerk-sdk-python - Not needed yet, auth is handled client-side
