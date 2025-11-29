@@ -18,4 +18,6 @@ async def load_and_split_pdf(file_path: str):
     )
     chunks = text_splitter.split_documents(docs)
     
+    print(f"📄 Loaded PDF: {len(docs)} pages → {len(chunks)} chunks")
+    
     return chunks

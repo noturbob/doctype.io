@@ -175,7 +175,7 @@ Analyze the following document content and answer the user's question with both 
     retriever = get_retriever()
     retrieval_chain = create_retrieval_chain(retriever, document_chain)
     
-    # 5. Run it
-    response = await retrieval_chain.ainvoke({"input": question})
+    # 5. Run it (use invoke, not ainvoke)
+    response = retrieval_chain.invoke({"input": question})
     
     return response["answer"]
