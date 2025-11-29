@@ -12,10 +12,18 @@ from app.config import settings
 
 app = FastAPI(title="Doctype.io API", version="1.0")
 
-# Fix CORS to allow frontend
+# --- Fix CORS to allow frontend ---
+# We list all the origins that are allowed to talk to this backend
+origins = [
+    settings.FRONTEND_URL,              # The URL from your .env file
+    "http://localhost:3000",            # Local development
+    "https://doctype-io.vercel.app",    # Production URL (Standard)
+    "https://doctype-io.vercel.app/"    # Production URL (With trailing slash)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000"],  # Added localhost as backup
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
