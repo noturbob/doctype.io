@@ -11,7 +11,7 @@
 
 **Transform your documents into conversations.** Upload PDFs and get instant, accurate answers powered by advanced RAG technology.
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Demo](#-usage) • [API Docs](#-api-documentation) • [Contributing](#-contributing)
+[Live Demo](https://doctype-io.vercel.app) • [Features](#-features) • [Quick Start](#-quick-start) • [API Docs](#-api-documentation) • [Deployment](#-deployment) • [Contributing](#-contributing)
 
 </div>
 
@@ -35,8 +35,8 @@
 
 ### 🔧 Technical Features
 
-- **🔐 Secure Authentication** - Powered by Clerk
-- **⚡ Real-time Processing** - Fast document ingestion and retrieval
+- **🔐 Sign-in with Clerk** - User accounts out of the box
+- **🔁 Rate-Limit Aware** - Automatic retries with backoff on the Gemini free tier
 - **📊 Interactive API Docs** - Built-in Swagger UI
 - **🎨 Modern UI** - Smooth animations with Framer Motion
 
@@ -51,12 +51,41 @@
 ```mermaid
 graph LR
     A[User] --> B[React Frontend]
+    B --> G[Clerk Auth]
     B --> C[FastAPI Backend]
     C --> D[LangChain RAG]
     D --> E[Google Gemini]
     D --> F[Upstash Vector DB]
-    C --> G[Clerk Auth]
 ```
+
+**Under the hood:**
+
+1. **Ingest** (`POST /ingest`): PyPDF extracts the text, which is split into 1000-character chunks with 200 characters of overlap. Each chunk is embedded with `text-embedding-004` and stored in Upstash Vector.
+2. **Chat** (`POST /chat`): the question is embedded, the 3 most similar chunks are retrieved, and `gemini-2.5-flash` answers using them as context.
+
+<details>
+<summary><b>Project structure</b></summary>
+
+```
+doctype.io/
+├── .env.example              # Backend env template
+├── backend/
+│   ├── requirements.txt
+│   ├── render.yaml           # Render deploy config
+│   └── app/
+│       ├── main.py           # FastAPI app, routes, CORS
+│       ├── config.py         # Settings loaded from .env
+│       ├── models/schemas.py # Request/response models
+│       └── services/
+│           ├── pdf_loader.py   # Load + split PDFs
+│           ├── vector_store.py # Embeddings + Upstash (with rate-limit retries)
+│           └── rag_chain.py    # Prompt + retrieval chain
+└── frontend/
+    ├── .env.example          # Frontend env template
+    └── src/App.tsx           # Upload + chat UI
+```
+
+</details>
 
 -----
 
@@ -94,9 +123,11 @@ graph LR
 
 ### Prerequisites
 
-- Python 3.8+
-- Node.js 16+
-- npm or yarn
+- Python 3.9+
+- Node.js 18+ and npm
+- A [Google AI Studio](https://aistudio.google.com/apikey) API key
+- A [Clerk](https://dashboard.clerk.com/) application
+- An [Upstash Vector](https://console.upstash.com/vector) index created with **dimensions `768`** and **metric `COSINE`**. These must match the `text-embedding-004` model, or ingestion will fail.
 
 ### ⚙️ Backend Setup
 
@@ -111,8 +142,8 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
-cp .env.example .env
+# Configure environment variables (the template lives in the repo root)
+cp ../.env.example .env
 # Edit .env with your API keys (see Environment Variables section)
 
 # Start the server
@@ -145,41 +176,25 @@ npm start
 ## 🔑 Environment Variables
 
 <details>
-<summary><b>Backend Configuration (.env)</b></summary>
+<summary><b>Backend Configuration (backend/.env)</b></summary>
 
-```bash
-# Google AI
-GOOGLE_API_KEY=your_google_api_key_here
-
-# Upstash Vector Database
-UPSTASH_VECTOR_REST_URL=your_upstash_url_here
-UPSTASH_VECTOR_REST_TOKEN=your_upstash_token_here
-
-# Clerk Authentication
-CLERK_SECRET_KEY=your_clerk_secret_key_here
-
-# CORS
-FRONTEND_URL=http://localhost:3000
-```
-
-**🔗 Get Your API Keys:**
-
-- [Google AI Studio](https://makersuite.google.com/app/apikey) - For Gemini API access
-- [Upstash Console](https://console.upstash.com/) - For vector database
-- [Clerk Dashboard](https://dashboard.clerk.com/) - For authentication
+|Variable                   |Required|Description                                                     |
+|---------------------------|--------|----------------------------------------------------------------|
+|`GOOGLE_API_KEY`           |Yes     |Gemini API key, used for embeddings and answers                 |
+|`UPSTASH_VECTOR_REST_URL`  |Yes     |Upstash Vector index REST URL                                   |
+|`UPSTASH_VECTOR_REST_TOKEN`|Yes     |Upstash Vector index token                                      |
+|`CLERK_SECRET_KEY`         |No      |Clerk secret key (not used yet, see Known Limitations)|
+|`FRONTEND_URL`             |No      |Extra origin allowed by CORS. Default: `http://localhost:3000`  |
 
 </details>
 
 <details>
-<summary><b>Frontend Configuration (.env)</b></summary>
+<summary><b>Frontend Configuration (frontend/.env)</b></summary>
 
-```bash
-# API Configuration
-REACT_APP_API_URL=http://127.0.0.1:8000
-
-# Clerk Authentication
-REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key_here
-```
+|Variable                         |Required|Description                                     |
+|---------------------------------|--------|------------------------------------------------|
+|`REACT_APP_CLERK_PUBLISHABLE_KEY`|Yes     |Clerk publishable key                           |
+|`REACT_APP_API_URL`              |No      |Backend URL. Default: `http://127.0.0.1:8000`   |
 
 </details>
 
@@ -202,45 +217,55 @@ Interactive API documentation is automatically generated and available at:
 
 ### Main Endpoints
 
-|Method|Endpoint |Description                          |
-|------|---------|-------------------------------------|
-|`GET` |`/`      |Health check & API status            |
-|`POST`|`/ingest`|Upload and process PDF documents     |
-|`POST`|`/chat`  |Query documents with natural language|
+|Method|Endpoint |Body                                     |Response                                      |
+|------|---------|-----------------------------------------|----------------------------------------------|
+|`GET` |`/`      |none                                     |`{ "status": "Doctype.io is running 🚀" }`     |
+|`POST`|`/ingest`|`multipart/form-data`, field `file` (PDF)|`{ "filename", "chunks_processed", "status" }`|
+|`POST`|`/chat`  |`{ "question": "..." }`                  |`{ "answer", "sources": [] }`                 |
 
-### Example Request
+Both `POST` endpoints accept an `Authorization: Bearer <clerk token>` header.
+
+### Example Requests
 
 ```bash
+# Upload a document
+curl -X POST "http://127.0.0.1:8000/ingest" \
+  -F "file=@document.pdf"
+
+# Ask a question
 curl -X POST "http://127.0.0.1:8000/chat" \
   -H "Content-Type: application/json" \
-  -d '{
-    "question": "What is the main topic of this document?",
-    "session_id": "user123"
-  }'
+  -d '{"question": "What is the main topic of this document?"}'
 ```
 
 -----
 
-## ⚠️ Rate Limits
+## 🌍 Deployment
 
-Google’s free tier includes the following limits:
+- **Backend (Render):** create a Web Service with root directory `backend`, build command `pip install -r requirements.txt`, and start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Add the backend env vars, and set `FRONTEND_URL` to your frontend's URL.
+- **Frontend (Vercel):** import the repo with root directory `frontend`, and set `REACT_APP_API_URL` to your Render URL.
 
-|Limit Type         |Value|
-|-------------------|-----|
-|Daily Requests     |1,500|
-|Requests per Minute|15   |
+To allow another frontend domain, set `FRONTEND_URL` or add it to `origins` in `backend/app/main.py`.
 
-The system includes built-in rate limiting and automatic retry logic to handle these limits gracefully.
+-----
+
+## ⚠️ Known Limitations
+
+- **Tokens aren't verified yet.** The backend doesn't validate the Clerk token, and it accepts requests with no token at all. Don't treat the API as protected.
+- **All documents share one index.** Every upload goes into the same Upstash index, so `/chat` searches everything ever ingested, across all users and files. To start fresh, clear the index from the Upstash console.
+- **Ingestion is slow on purpose.** To stay within Gemini's free-tier limits, chunks are embedded one at a time with a 3-second pause between them, and rate-limit errors are retried with backoff (5s, 10s, 20s). A 20-page PDF can take several minutes.
+- **`sources` is always empty.** Answers don't cite their source chunks yet.
 
 -----
 
 ## 🗺️ Roadmap
 
+- [ ] Verify Clerk tokens on the backend
+- [ ] Per-user document isolation
+- [ ] Source citations in answers
 - [ ] Support for multiple document formats (DOCX, TXT, etc.)
-- [ ] Multi-document querying
 - [ ] Export conversation history
 - [ ] Custom AI model selection
-- [ ] Advanced search filters
 - [ ] Document summarization
 - [ ] Mobile app
 
@@ -260,7 +285,7 @@ Contributions are what make the open-source community amazing! Any contributions
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License.
 
 -----
 
