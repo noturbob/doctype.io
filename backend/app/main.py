@@ -81,7 +81,7 @@ async def ingest_document(
         
         return IngestResponse(
             filename=file.filename,
-            chunks_processed=len(chunks),
+            chunks_processed=len(chunks), 
             status="Successfully embedded"
         )
     except Exception as e:
